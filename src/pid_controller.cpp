@@ -81,7 +81,19 @@ void PIDController::stopTask()
 
 void PIDController::setPIDParameters(double kp, double ki, double kd)
 {
-    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    // Input validation
+    if (kp < 0 || ki < 0 || kd < 0)
+    {
+        Serial.println("PID Controller: Error - PID parameters must be non-negative");
+        return;
+    }
+
+    if (kp > 1000 || ki > 100 || kd > 100)
+    {
+        Serial.println("PID Controller: Warning - PID parameters seem unusually high");
+    }
+
+    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 100ms
     {
         Kp = kp;
         Ki = ki;
@@ -97,11 +109,15 @@ void PIDController::setPIDParameters(double kp, double ki, double kd)
 
         xSemaphoreGive(dataMutex);
     }
+    else
+    {
+        Serial.println("PID Controller: Failed to acquire mutex for parameter update");
+    }
 }
 
 void PIDController::getPIDParameters(double &kp, double &ki, double &kd)
 {
-    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         kp = Kp;
         ki = Ki;
@@ -118,7 +134,14 @@ void PIDController::getPIDParameters(double &kp, double &ki, double &kd)
 
 void PIDController::setTargetTemperature(double target)
 {
-    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    // Input validation for temperature range
+    if (target < 0 || target > 60)
+    {
+        Serial.println("PID Controller: Error - Target temperature out of safe range (0-60°C)");
+        return;
+    }
+
+    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 100ms
     {
         targetTemp = target;
 
@@ -129,6 +152,10 @@ void PIDController::setTargetTemperature(double target)
 
         xSemaphoreGive(dataMutex);
     }
+    else
+    {
+        Serial.println("PID Controller: Failed to acquire mutex for target temperature update");
+    }
 }
 
 double PIDController::getTargetTemperature()
@@ -137,7 +164,7 @@ double PIDController::getTargetTemperature()
         return targetTemp;
 
     double target = 0.0;
-    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         target = targetTemp;
         xSemaphoreGive(dataMutex);
@@ -195,9 +222,9 @@ void PIDController::pidControlTask(void *pvParameters)
 
 void PIDController::updateTemperature(double currentTemp, bool sensorConnected)
 {
-    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
-        if (sensorConnected)
+        if (sensorConnected && isValidTemperature(currentTemp))
         {
             // Calculate error (positive error means too hot, need more cooling)
             error = currentTemp - targetTemp;
@@ -206,12 +233,31 @@ void PIDController::updateTemperature(double currentTemp, bool sensorConnected)
         }
         else
         {
-            // Safety: turn off cooling if sensor disconnected
+            // Safety: turn off cooling if sensor disconnected or invalid reading
             pwmValue = 0;
+            integral = 0; // Reset integral when sensor fails
             ledcWrite(PWM_CHANNEL, 0);
+            if (!sensorConnected)
+            {
+                Serial.println("PID Controller: Sensor disconnected - cooling disabled");
+            }
+            else
+            {
+                Serial.println("PID Controller: Invalid temperature reading - cooling disabled");
+            }
         }
         xSemaphoreGive(dataMutex);
     }
+    else
+    {
+        Serial.println("PID Controller: Failed to acquire mutex for temperature update");
+    }
+}
+
+// Add helper function for temperature validation
+bool PIDController::isValidTemperature(double temp)
+{
+    return (temp > -50 && temp < 100); // Reasonable temperature range for sensor
 }
 
 void PIDController::calculatePID()
@@ -224,10 +270,8 @@ void PIDController::calculatePID()
         return; // Prevent division by zero
     }
 
-    // Calculate error (positive error means too hot, need more cooling)
-    // This will be set by updateTemperature with current temp
-    // For now, we'll use a placeholder - this should be passed as parameter
-    // error = currentTemp - targetTemp;  // This line should use actual current temp
+    // Error is already calculated in updateTemperature()
+    // (positive error means too hot, need more cooling)
 
     // Safety check - if temperature difference is too large, use maximum cooling
     if (abs(error) > MAX_TEMP_DIFF)
@@ -241,6 +285,8 @@ void PIDController::calculatePID()
         {
             pwmValue = MIN_PWM; // No cooling needed
         }
+        // Reset integral to prevent windup
+        integral = 0;
         lastPIDTime = currentTime;
         return;
     }

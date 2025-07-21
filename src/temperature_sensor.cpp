@@ -85,7 +85,7 @@ double TemperatureSensor::getCurrentTemperature()
         return currentTemp;
 
     double temp = 0.0;
-    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         temp = currentTemp;
         xSemaphoreGive(dataMutex);
@@ -99,7 +99,7 @@ bool TemperatureSensor::isConnected()
         return sensorConnected;
 
     bool connected = false;
-    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         connected = sensorConnected;
         xSemaphoreGive(dataMutex);
@@ -113,7 +113,7 @@ unsigned long TemperatureSensor::getLastReadingTime()
         return lastReadingTime;
 
     unsigned long time = 0;
-    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         time = lastReadingTime;
         xSemaphoreGive(dataMutex);
@@ -150,13 +150,13 @@ void TemperatureSensor::readTemperature()
     // Request temperature reading
     tempSensor->requestTemperatures();
 
-    // Small delay for temperature conversion
-    vTaskDelay(pdMS_TO_TICKS(10));
+    // Small delay for temperature conversion (increased for 12-bit resolution)
+    vTaskDelay(pdMS_TO_TICKS(20));
 
     float temp = tempSensor->getTempCByIndex(0);
 
     // Update global variables with mutex protection
-    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+    if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
         if (isValidTemperature(temp))
         {
@@ -167,13 +167,14 @@ void TemperatureSensor::readTemperature()
         else
         {
             sensorConnected = false;
-            Serial.println("Temperature Sensor: Invalid reading or sensor disconnected!");
+            Serial.print("Temperature Sensor: Invalid reading: ");
+            Serial.println(temp);
         }
         xSemaphoreGive(dataMutex);
     }
     else
     {
-        Serial.println("Temperature Sensor: Failed to acquire mutex");
+        Serial.println("Temperature Sensor: Failed to acquire mutex for reading");
     }
 }
 

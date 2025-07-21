@@ -22,13 +22,16 @@ constexpr uint8_t MAX_RPC_RESPONSE = 5U;
 
 // Temperature Control Settings
 #define DEFAULT_TARGET_TEMP 25.0 // Default target temperature in Celsius
-#define PWM_FREQUENCY 10         // PWM frequency in Hz
+#define PWM_FREQUENCY 10         // PWM frequency in Hz (increased from 10Hz)
 #define PWM_RESOLUTION 10        // 10-bit resolution (0-1023)
 
 // Safety and limits
 #define MIN_PWM 0
 #define MAX_PWM 1023
 #define MAX_TEMP_DIFF 50.0
+#define MAX_SAFE_TEMP 60.0   // Maximum safe operating temperature
+#define MIN_SAFE_TEMP -10.0  // Minimum safe operating temperature
+#define MUTEX_TIMEOUT_MS 200 // Standard mutex timeout
 
 // Timing intervals (in milliseconds)
 #define TEMP_READING_INTERVAL 500 // Temperature reading interval

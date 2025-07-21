@@ -233,19 +233,27 @@ bool startAllTasks()
 void coordinationTask(void *pvParameters)
 {
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  unsigned long lastHeartbeat = 0;
 
   Serial.println("Coordination task: Started");
 
   while (1)
   {
+    // Print periodic heartbeat from coordination task
+    if (millis() - lastHeartbeat > 30000)
+    {
+      Serial.println("Coordination task: Running normally");
+      lastHeartbeat = millis();
+    }
+
     // Ensure WiFi connection
     if (!wifiManager.ensureConnection())
     {
-      Serial.println("Coordination task: WiFi connection lost");
+      Serial.println("Coordination task: WiFi connection lost, retrying...");
     }
 
     // Get temperature data and update PID controller
-    if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased timeout
     {
       double currentTemp = temperatureSensor.getCurrentTemperature();
       bool sensorConnected = temperatureSensor.isConnected();
@@ -260,7 +268,7 @@ void coordinationTask(void *pvParameters)
     }
     else
     {
-      Serial.println("Coordination task: Failed to acquire mutex");
+      Serial.println("Coordination task: Failed to acquire mutex - system may be overloaded");
     }
 
     // Yield to other tasks

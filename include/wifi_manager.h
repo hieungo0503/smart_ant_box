@@ -11,6 +11,9 @@ public:
     // Constructor
     WiFiManager();
 
+    // Destructor
+    ~WiFiManager();
+
     // Initialize WiFi connection or start config portal
     bool begin();
 

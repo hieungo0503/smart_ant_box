@@ -82,6 +82,9 @@ private:
 
     // Safety check for temperature difference
     bool isTemperatureSafe(double currentTemp);
+
+    // Temperature validation helper
+    bool isValidTemperature(double temp);
 };
 
 #endif // PID_CONTROLLER_H

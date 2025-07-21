@@ -4,12 +4,24 @@
 #include <DNSServer.h>
 
 // Static member definitions
-const char *WiFiManager::AP_SSID = AP_SSID;
-const char *WiFiManager::AP_PASSWORD = AP_PASSWORD;
+const char *WiFiManager::AP_SSID = "ESP32-SmartCooling";
+const char *WiFiManager::AP_PASSWORD = "12345678";
 
 WiFiManager::WiFiManager() : server(nullptr), configMode(false)
 {
     // Constructor - initialize server pointer
+}
+
+// Add destructor for proper cleanup
+WiFiManager::~WiFiManager()
+{
+    if (server != nullptr)
+    {
+        server->end();
+        delete server;
+        server = nullptr;
+    }
+    preferences.end();
 }
 
 bool WiFiManager::begin()
@@ -138,12 +150,15 @@ bool WiFiManager::stopConfigPortal()
     configMode = false;
 
     // Try to connect with configured credentials
-    if (ssid.length() > 0)
+    if (ssid.length() > 0 && password.length() > 0)
     {
         return connectToWiFi();
     }
-
-    return false;
+    else
+    {
+        Serial.println("WiFi Manager: No valid credentials to connect");
+        return false;
+    }
 }
 
 bool WiFiManager::isConfigMode()
