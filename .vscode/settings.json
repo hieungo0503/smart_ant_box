@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "esp32-hal.h": "c",
+        "esp32-hal-ledc.h": "c"
+    }
+}
