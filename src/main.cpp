@@ -255,11 +255,12 @@ void coordinationTask(void *pvParameters)
     // Get temperature data and update PID controller
     if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased timeout
     {
-      double currentTemp = temperatureSensor.getCurrentTemperature();
-      bool sensorConnected = temperatureSensor.isConnected();
+      // Get temperature data using internal functions while holding mutex
+      double currentTemp = temperatureSensor.getCurrentTemperatureInternal();
+      bool sensorConnected = temperatureSensor.isConnectedInternal();
 
-      // Update PID controller with current temperature
-      pidController.updateTemperature(currentTemp, sensorConnected);
+      // Update PID controller using internal function while holding mutex
+      pidController.updateTemperatureInternal(currentTemp, sensorConnected);
 
       xSemaphoreGive(xDataMutex);
 

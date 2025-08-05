@@ -16,8 +16,8 @@ constexpr uint8_t MAX_RPC_SUBSCRIPTIONS = 2U;
 constexpr uint8_t MAX_RPC_RESPONSE = 5U;
 
 // Pin Definitions
-#define TEMP_SENSOR_PIN 2 // D2 - Temperature sensor data pin
-#define PWM_OUTPUT_PIN 15 // D15 - PWM output to MOSFET module
+#define TEMP_SENSOR_PIN 14 // D14 - Temperature sensor data pin
+#define PWM_OUTPUT_PIN 16 // D16 - PWM output to MOSFET module
 #define PWM_CHANNEL 0     // LEDC channel for PWM output
 
 // Temperature Control Settings

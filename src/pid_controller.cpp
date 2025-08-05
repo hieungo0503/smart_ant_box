@@ -224,33 +224,38 @@ void PIDController::updateTemperature(double currentTemp, bool sensorConnected)
 {
     if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased from 50ms
     {
-        if (sensorConnected && isValidTemperature(currentTemp))
-        {
-            // Calculate error (positive error means too hot, need more cooling)
-            error = currentTemp - targetTemp;
-            calculatePID();
-            applyPWM();
-        }
-        else
-        {
-            // Safety: turn off cooling if sensor disconnected or invalid reading
-            pwmValue = 0;
-            integral = 0; // Reset integral when sensor fails
-            ledcWrite(PWM_CHANNEL, 0);
-            if (!sensorConnected)
-            {
-                Serial.println("PID Controller: Sensor disconnected - cooling disabled");
-            }
-            else
-            {
-                Serial.println("PID Controller: Invalid temperature reading - cooling disabled");
-            }
-        }
+        updateTemperatureInternal(currentTemp, sensorConnected);
         xSemaphoreGive(dataMutex);
     }
     else
     {
         Serial.println("PID Controller: Failed to acquire mutex for temperature update");
+    }
+}
+
+void PIDController::updateTemperatureInternal(double currentTemp, bool sensorConnected)
+{
+    if (sensorConnected && isValidTemperature(currentTemp))
+    {
+        // Calculate error (positive error means too hot, need more cooling)
+        error = currentTemp - targetTemp;
+        calculatePID();
+        applyPWM();
+    }
+    else
+    {
+        // Safety: turn off cooling if sensor disconnected or invalid reading
+        pwmValue = 0;
+        integral = 0; // Reset integral when sensor fails
+        ledcWrite(PWM_CHANNEL, 0);
+        if (!sensorConnected)
+        {
+            Serial.println("PID Controller: Sensor disconnected - cooling disabled");
+        }
+        else
+        {
+            Serial.println("PID Controller: Invalid temperature reading - cooling disabled");
+        }
     }
 }
 

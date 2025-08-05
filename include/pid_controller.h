@@ -38,6 +38,9 @@ public:
     // Update current temperature and perform PID calculation
     void updateTemperature(double currentTemp, bool sensorConnected);
 
+    // Internal update function (non-mutex) for use when mutex is already held
+    void updateTemperatureInternal(double currentTemp, bool sensorConnected);
+
     // Get current PID output values
     double getError();
     double getPIDOutput();
@@ -45,6 +48,18 @@ public:
 
     // Output data for serial plotter
     void outputSerialData(double currentTemp);
+
+    // Internal getters (non-mutex) for use when mutex is already held
+    double getTargetTemperatureInternal() const { return targetTemp; }
+    void getPIDParametersInternal(double &kp, double &ki, double &kd) const
+    {
+        kp = Kp;
+        ki = Ki;
+        kd = Kd;
+    }
+    double getErrorInternal() const { return error; }
+    double getPIDOutputInternal() const { return pidOutput; }
+    int getPWMValueInternal() const { return pwmValue; }
 
 private:
     // PID parameters

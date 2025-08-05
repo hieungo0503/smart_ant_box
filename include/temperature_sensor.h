@@ -37,6 +37,11 @@ public:
     // Get device count
     int getDeviceCount();
 
+    // Internal getters (non-mutex) for use when mutex is already held
+    double getCurrentTemperatureInternal() const { return currentTemp; }
+    bool isConnectedInternal() const { return sensorConnected; }
+    unsigned long getLastReadingTimeInternal() const { return lastReadingTime; }
+
 private:
     // OneWire and DallasTemperature objects
     OneWire *oneWire;

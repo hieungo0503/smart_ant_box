@@ -224,37 +224,42 @@ void ThingsBoardClient::sendTelemetryLoop()
     unsigned long currentTime = millis();
     if (currentTime - lastTelemetrySend >= TB_SEND_INTERVAL)
     {
-        if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+        if (dataMutex != NULL && xSemaphoreTake(dataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased timeout
         {
             if (temperatureSensor != nullptr && pidController != nullptr &&
-                temperatureSensor->isConnected() && isConnected())
+                temperatureSensor->isConnectedInternal() && isConnected())
             {
-
-                // Get current values
-                double currentTemp = temperatureSensor->getCurrentTemperature();
-                double targetTemp = pidController->getTargetTemperature();
-                int pwmValue = pidController->getPWMValue();
-                double error = pidController->getError();
-                double pidOutput = pidController->getPIDOutput();
+                // Get current values using internal functions while holding mutex
+                double currentTemp = temperatureSensor->getCurrentTemperatureInternal();
+                double targetTemp = pidController->getTargetTemperatureInternal();
+                int pwmValue = pidController->getPWMValueInternal();
+                double error = pidController->getErrorInternal();
+                double pidOutput = pidController->getPIDOutputInternal();
+                bool sensorConnected = temperatureSensor->isConnectedInternal();
 
                 double kp, ki, kd;
-                pidController->getPIDParameters(kp, ki, kd);
+                pidController->getPIDParametersInternal(kp, ki, kd);
 
-                // Send telemetry data using the library's API
+                xSemaphoreGive(dataMutex);
+
+                // Send telemetry data using the library's API (outside mutex)
                 tb->sendTelemetryData("temperature", currentTemp);
                 tb->sendTelemetryData("targetTemp", targetTemp);
                 tb->sendTelemetryData("pwmValue", pwmValue);
                 tb->sendTelemetryData("pwmPercent", map(pwmValue, 0, 1023, 0, 100));
                 tb->sendTelemetryData("error", error);
                 tb->sendTelemetryData("pidOutput", pidOutput);
-                tb->sendTelemetryData("sensorConnected", temperatureSensor->isConnected());
+                tb->sendTelemetryData("sensorConnected", sensorConnected);
                 tb->sendTelemetryData("kp", kp);
                 tb->sendTelemetryData("ki", ki);
                 tb->sendTelemetryData("kd", kd);
 
                 lastTelemetrySend = currentTime;
             }
-            xSemaphoreGive(dataMutex);
+            else
+            {
+                xSemaphoreGive(dataMutex);
+            }
         }
         else
         {
