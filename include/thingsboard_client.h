@@ -14,6 +14,7 @@
 // Forward declarations
 class PIDController;
 class TemperatureSensor;
+class WiFiManager;
 
 class ThingsBoardClient
 {
@@ -28,7 +29,7 @@ public:
     bool begin();
 
     // Start the ThingsBoard communication task
-    bool startTask(SemaphoreHandle_t dataMutex, PIDController *pidController, TemperatureSensor *tempSensor);
+    bool startTask(SemaphoreHandle_t dataMutex, PIDController *pidController, TemperatureSensor *tempSensor, WiFiManager *wifiMgr);
 
     // Stop the ThingsBoard communication task
     void stopTask();
@@ -57,6 +58,7 @@ private:
     // References to other components
     PIDController *pidController;
     TemperatureSensor *temperatureSensor;
+    WiFiManager *wifiManager;
 
     // Connection status
     bool subscribed;

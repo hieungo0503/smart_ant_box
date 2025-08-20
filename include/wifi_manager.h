@@ -26,6 +26,12 @@ public:
     // Get IP address
     IPAddress getLocalIP();
 
+    // Get current IP address as string
+    const char *getCurrentIP();
+
+    // Get current IP address
+    char current_ip[20];
+
     // Print connection info
     void printConnectionInfo();
 
@@ -38,12 +44,24 @@ public:
     // Check if in config mode
     bool isConfigMode();
 
+    // Start permanent web server for WiFi management
+    void startPermanentWebServer();
+
+    // Stop permanent web server
+    void stopPermanentWebServer();
+
+    // Handle web server in main loop
+    void handleWebServer();
+
 private:
     // Preferences for storing WiFi credentials
     Preferences preferences;
 
     // Web server for configuration
     AsyncWebServer *server;
+
+    // Permanent web server for ongoing management
+    AsyncWebServer *permanentServer;
 
     // Configuration mode flag
     bool configMode;

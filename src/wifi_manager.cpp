@@ -7,9 +7,9 @@
 const char *WiFiManager::AP_SSID = "ESP32-SmartCooling";
 const char *WiFiManager::AP_PASSWORD = "12345678";
 
-WiFiManager::WiFiManager() : server(nullptr), configMode(false)
+WiFiManager::WiFiManager() : server(nullptr), permanentServer(nullptr), configMode(false)
 {
-    // Constructor - initialize server pointer
+    // Constructor - initialize server pointers
 }
 
 // Add destructor for proper cleanup
@@ -20,6 +20,12 @@ WiFiManager::~WiFiManager()
         server->end();
         delete server;
         server = nullptr;
+    }
+    if (permanentServer != nullptr)
+    {
+        permanentServer->end();
+        delete permanentServer;
+        permanentServer = nullptr;
     }
     preferences.end();
 }
@@ -103,6 +109,7 @@ void WiFiManager::printConnectionInfo()
         Serial.println(ssid);
         Serial.print("WiFi Manager: IP address: ");
         Serial.println(getLocalIP());
+        strcpy(current_ip, getLocalIP().toString().c_str());
         Serial.print("WiFi Manager: Signal strength: ");
         Serial.print(WiFi.RSSI());
         Serial.println(" dBm");
@@ -195,6 +202,7 @@ bool WiFiManager::connectToWiFi()
     {
         configMode = false;
         printConnectionInfo();
+        startPermanentWebServer();
         return true;
     }
     else
@@ -339,15 +347,12 @@ String WiFiManager::generateConfigPage()
         <h1>🌡️ Smart Cooling System</h1>
         <div class="info">
             <strong>WiFi Configuration</strong><br>
+            Current Status: <span id="currentStatus">Loading...</span><br>
+            Current Network: <span id="currentNetwork">Loading...</span><br>
             Connect your ESP32 to your WiFi network to enable remote monitoring and control via ThingsBoard.
         </div>
         
         <form action="/configure" method="post">
-            <div class="form-group">
-                <button type="button" class="scan-btn" onclick="scanNetworks()">📶 Scan WiFi Networks</button>
-                <div id="networks" class="network-list" style="display:none;"></div>
-            </div>
-            
             <div class="form-group">
                 <label for="ssid">WiFi Network Name (SSID):</label>
                 <input type="text" id="ssid" name="ssid" required placeholder="Enter WiFi network name">
@@ -365,27 +370,6 @@ String WiFiManager::generateConfigPage()
     </div>
 
     <script>
-        function scanNetworks() {
-            document.getElementById('networks').style.display = 'block';
-            document.getElementById('networks').innerHTML = '<div style="text-align:center;padding:20px;">Scanning...</div>';
-            
-            fetch('/scan')
-                .then(response => response.json())
-                .then(data => {
-                    let html = '';
-                    data.forEach(network => {
-                        html += `<div class="network-item" onclick="selectNetwork('${network.ssid}')">
-                            <strong>${network.ssid}</strong>
-                            <span class="signal-strength">${network.rssi}dBm ${network.secure ? '🔒' : '🔓'}</span>
-                        </div>`;
-                    });
-                    document.getElementById('networks').innerHTML = html;
-                })
-                .catch(error => {
-                    document.getElementById('networks').innerHTML = '<div style="text-align:center;padding:20px;color:red;">Scan failed</div>';
-                });
-        }
-        
         function selectNetwork(ssid) {
             document.getElementById('ssid').value = ssid;
             document.getElementById('password').focus();
@@ -396,6 +380,25 @@ String WiFiManager::generateConfigPage()
                 window.location.href = '/reset';
             }
         }
+        
+        // Load current status
+        function loadStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('currentStatus').textContent = data.connected ? 'Connected ✅' : 'Disconnected ❌';
+                    document.getElementById('currentNetwork').textContent = data.ssid || 'None';
+                })
+                .catch(error => {
+                    document.getElementById('currentStatus').textContent = 'Error loading status';
+                    document.getElementById('currentNetwork').textContent = 'Unknown';
+                });
+        }
+        
+        // Load status when page loads
+        window.onload = function() {
+            loadStatus();
+        };
     </script>
 </body>
 </html>
@@ -448,4 +451,122 @@ String WiFiManager::generateSuccessPage()
 )rawliteral";
 
     return html;
+}
+
+void WiFiManager::startPermanentWebServer()
+{
+    if (permanentServer != nullptr)
+    {
+        return; // Already running
+    }
+
+    Serial.println("WiFi Manager: Starting permanent web server...");
+
+    permanentServer = new AsyncWebServer(80);
+
+    // Serve the main configuration page
+    permanentServer->on("/", HTTP_GET, [this](AsyncWebServerRequest *request)
+                        { request->send(200, "text/html", generateConfigPage()); });
+
+    // Handle WiFi configuration submission
+    permanentServer->on("/configure", HTTP_POST, [this](AsyncWebServerRequest *request)
+                        {
+        String newSsid = "";
+        String newPassword = "";
+        
+        if (request->hasParam("ssid", true))
+        {
+            newSsid = request->getParam("ssid", true)->value();
+        }
+        
+        if (request->hasParam("password", true))
+        {
+            newPassword = request->getParam("password", true)->value();
+        }
+        
+        if (newSsid.length() > 0)
+        {
+            saveCredentials(newSsid, newPassword);
+            request->send(200, "text/html", generateSuccessPage());
+            
+            // Delay and restart to apply new settings
+            delay(3000);
+            ESP.restart();
+        }
+        else
+        {
+            request->send(400, "text/html", "<h1>Error: SSID cannot be empty!</h1><a href='/'>Go back</a>");
+        } });
+
+    // Handle reset credentials
+    permanentServer->on("/reset", HTTP_GET, [this](AsyncWebServerRequest *request)
+                        {
+        preferences.clear();
+        ssid = "";
+        password = "";
+        request->send(200, "text/html", "<h1>Credentials Reset!</h1><p>Device will restart...</p>");
+        delay(3000);
+        ESP.restart(); });
+
+    // Serve scan results
+    permanentServer->on("/scan", HTTP_GET, [this](AsyncWebServerRequest *request)
+                        {
+        String json = "[";
+        int n = WiFi.scanNetworks();
+        for (int i = 0; i < n; ++i)
+        {
+            if (i) json += ",";
+            json += "{";
+            json += "\"ssid\":\"" + WiFi.SSID(i) + "\",";
+            json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
+            json += "\"secure\":" + String(WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+            json += "}";
+        }
+        json += "]";
+        request->send(200, "application/json", json); });
+
+    // Add a status endpoint
+    permanentServer->on("/status", HTTP_GET, [this](AsyncWebServerRequest *request)
+                        {
+        String json = "{";
+        json += "\"connected\": " + String(isConnected() ? "true" : "false") + ",";
+        json += "\"ssid\": \"" + ssid + "\",";
+        json += "\"ip\": \"" + getLocalIP().toString() + "\",";
+        json += "\"rssi\": " + String(WiFi.RSSI()) + ",";
+        json += "\"uptime\": " + String(millis());
+        json += "}";
+        request->send(200, "application/json", json); });
+
+    permanentServer->begin();
+    Serial.println("WiFi Manager: Permanent web server started on port 80");
+    Serial.print("WiFi Manager: Access at http://");
+    Serial.println(getLocalIP());
+
+    // Update current IP for telemetry
+    strcpy(current_ip, getLocalIP().toString().c_str());
+}
+
+void WiFiManager::stopPermanentWebServer()
+{
+    if (permanentServer != nullptr)
+    {
+        Serial.println("WiFi Manager: Stopping permanent web server...");
+        permanentServer->end();
+        delete permanentServer;
+        permanentServer = nullptr;
+    }
+}
+
+const char *WiFiManager::getCurrentIP()
+{
+    // Update current IP and return it
+    strcpy(current_ip, getLocalIP().toString().c_str());
+    return current_ip;
+}
+
+void WiFiManager::handleWebServer()
+{
+    // This method is called from the main loop to handle web server requests
+    // AsyncWebServer handles requests automatically, so this is mostly a placeholder
+    // for future functionality if needed
 }

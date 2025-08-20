@@ -2,6 +2,7 @@
 #include "config.h"
 #include "pid_controller.h"
 #include "temperature_sensor.h"
+#include "wifi_manager.h"
 #include <Arduino.h>
 
 // Static instance reference for RPC callbacks
@@ -53,7 +54,7 @@ bool ThingsBoardClient::begin()
     return true;
 }
 
-bool ThingsBoardClient::startTask(SemaphoreHandle_t mutex, PIDController *pid, TemperatureSensor *temp)
+bool ThingsBoardClient::startTask(SemaphoreHandle_t mutex, PIDController *pid, TemperatureSensor *temp, WiFiManager *wifiMgr)
 {
     if (taskHandle != NULL)
     {
@@ -64,6 +65,7 @@ bool ThingsBoardClient::startTask(SemaphoreHandle_t mutex, PIDController *pid, T
     dataMutex = mutex;
     pidController = pid;
     temperatureSensor = temp;
+    wifiManager = wifiMgr;
 
     BaseType_t result = xTaskCreatePinnedToCore(
         thingsBoardTask,
@@ -253,6 +255,7 @@ void ThingsBoardClient::sendTelemetryLoop()
                 tb->sendTelemetryData("kp", kp);
                 tb->sendTelemetryData("ki", ki);
                 tb->sendTelemetryData("kd", kd);
+                tb->sendTelemetryData("currentIP", wifiManager->getCurrentIP());
 
                 lastTelemetrySend = currentTime;
             }

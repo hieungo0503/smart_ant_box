@@ -201,7 +201,7 @@ bool startAllTasks()
   Serial.println("✓ PID controller task started");
 
   // Start ThingsBoard client task
-  if (!thingsBoardClient.startTask(xDataMutex, &pidController, &temperatureSensor))
+  if (!thingsBoardClient.startTask(xDataMutex, &pidController, &temperatureSensor, &wifiManager))
   {
     Serial.println("ERROR: Failed to start ThingsBoard client task");
     return false;
@@ -251,6 +251,9 @@ void coordinationTask(void *pvParameters)
     {
       Serial.println("Coordination task: WiFi connection lost, retrying...");
     }
+
+    // Handle web server requests
+    wifiManager.handleWebServer();
 
     // Get temperature data and update PID controller
     if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(200)) == pdTRUE) // Increased timeout
