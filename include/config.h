@@ -41,9 +41,14 @@ constexpr uint8_t MAX_RPC_RESPONSE = 5U;
 // RPC method names
 constexpr const char RPC_SET_TARGET_TEMP[] = "setTargetTemp";
 constexpr const char RPC_SET_PID_PARAMS[] = "setPidParams";
-constexpr const char RPC_TARGET_TEMP_KEY[] = "value";
+constexpr const char RPC_TARGET_TEMP_KEY[] = "params";
 constexpr const char RPC_KP_KEY[] = "kp";
 constexpr const char RPC_KI_KEY[] = "ki";
 constexpr const char RPC_KD_KEY[] = "kd";
+
+// Default PID parameters
+constexpr double DEFAULT_KP = 50.0;
+constexpr double DEFAULT_KI = 1.5;
+constexpr double DEFAULT_KD = 12.0;
 
 #endif // CONFIG_H

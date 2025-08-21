@@ -10,6 +10,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+#include <Preferences.h>
 
 // Forward declarations
 class PIDController;
@@ -59,6 +60,7 @@ private:
     PIDController *pidController;
     TemperatureSensor *temperatureSensor;
     WiFiManager *wifiManager;
+    Preferences preferences;
 
     // Connection status
     bool subscribed;
@@ -72,6 +74,7 @@ private:
     bool subscribeToRPC();
     void sendTelemetryLoop();
     void processThingsBoardLoop();
+    void recreateRPCObject();
 
     // RPC callback functions (static)
     static void processSetTargetTemp(const JsonVariantConst &data, JsonDocument &response);
@@ -83,6 +86,13 @@ private:
     // Helper methods for RPC
     void handleSetTargetTemp(const JsonVariantConst &data, JsonDocument &response);
     void handleSetPidParams(const JsonVariantConst &data, JsonDocument &response);
+
+    // JSON string parsing helper
+    float extractFloatFromJson(const String &jsonString, const String &key);
+
+    // Save Config of ThingsBoard server
+    void saveTargetTemperature(double targetTemp);
+    void savePIDParameters(double kp, double ki, double kd);
 };
 
 #endif // THINGSBOARD_CLIENT_H

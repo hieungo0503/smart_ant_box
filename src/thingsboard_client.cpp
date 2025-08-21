@@ -38,10 +38,14 @@ ThingsBoardClient::~ThingsBoardClient()
     delete rpc;
     delete mqttClient;
     instance = nullptr;
+    preferences.end();
 }
 
 bool ThingsBoardClient::begin()
 {
+    // Initialize Preferences for storing configuration
+    preferences.begin("smart_config", false);
+
     Serial.println("ThingsBoard Client: Initializing...");
 
     if (tb == nullptr || rpc == nullptr || mqttClient == nullptr)
@@ -188,6 +192,9 @@ bool ThingsBoardClient::connectToThingsBoard()
     }
 
     Serial.println("ThingsBoard Client: Connected successfully!");
+
+    // Recreate RPC object to clear any previous subscriptions
+    recreateRPCObject();
     subscribed = false; // Reset subscription status
     return true;
 }
@@ -318,7 +325,9 @@ void ThingsBoardClient::handleSetTargetTemp(const JsonVariantConst &data, JsonDo
     Serial.println("ThingsBoard Client: Received setTargetTemp RPC request");
 
     // Extract the new target temperature
-    const float newTargetTemp = data[RPC_TARGET_TEMP_KEY];
+    const double newTargetTemp = double(data);
+
+    saveTargetTemperature(newTargetTemp);
 
     // Validate temperature range
     if (newTargetTemp > 0 && newTargetTemp < 60)
@@ -352,11 +361,21 @@ void ThingsBoardClient::handleSetTargetTemp(const JsonVariantConst &data, JsonDo
 void ThingsBoardClient::handleSetPidParams(const JsonVariantConst &data, JsonDocument &response)
 {
     Serial.println("ThingsBoard Client: Received setPidParams RPC request");
+    String jsonString = data.as<String>();
+    Serial.println("  Data: " + jsonString);
 
-    // Extract PID parameters
-    const float newKp = data[RPC_KP_KEY];
-    const float newKi = data[RPC_KI_KEY];
-    const float newKd = data[RPC_KD_KEY];
+    // Extract PID parameters using helper function
+    const float newKp = extractFloatFromJson(jsonString, "kp");
+    const float newKi = extractFloatFromJson(jsonString, "ki");
+    const float newKd = extractFloatFromJson(jsonString, "kd");
+
+    savePIDParameters(newKp, newKi, newKd);
+
+    // Debug: Print extracted values
+    Serial.println("Debug: Extracted values:");
+    Serial.println("  newKp: " + String(newKp));
+    Serial.println("  newKi: " + String(newKi));
+    Serial.println("  newKd: " + String(newKd));
 
     // Validate PID parameters (basic validation)
     if (newKp >= 0 && newKi >= 0 && newKd >= 0)
@@ -392,4 +411,83 @@ void ThingsBoardClient::handleSetPidParams(const JsonVariantConst &data, JsonDoc
     response["receivedKp"] = newKp;
     response["receivedKi"] = newKi;
     response["receivedKd"] = newKd;
+}
+
+float ThingsBoardClient::extractFloatFromJson(const String &jsonString, const String &key)
+{
+    // Create the search pattern: "key":
+    String searchKey = "\"" + key + "\":";
+
+    // Find the key in the JSON string
+    int keyStart = jsonString.indexOf(searchKey);
+    if (keyStart == -1)
+    {
+        return 0.0; // Key not found
+    }
+
+    // Move past the key and colon
+    int valueStart = keyStart + searchKey.length();
+
+    // Skip any whitespace after the colon
+    while (valueStart < jsonString.length() && jsonString.charAt(valueStart) == ' ')
+    {
+        valueStart++;
+    }
+
+    // Find the end of the value (comma or closing brace)
+    int valueEnd = jsonString.indexOf(',', valueStart);
+    if (valueEnd == -1)
+    {
+        valueEnd = jsonString.indexOf('}', valueStart);
+    }
+
+    if (valueEnd == -1)
+    {
+        return 0.0; // Malformed JSON
+    }
+
+    // Extract the value substring and convert to float
+    String valueStr = jsonString.substring(valueStart, valueEnd);
+    valueStr.trim(); // Remove any leading/trailing whitespace
+
+    return valueStr.toFloat();
+}
+
+void ThingsBoardClient::recreateRPCObject()
+{
+    Serial.println("ThingsBoard Client: Recreating RPC object to clear previous subscriptions...");
+
+    // Delete the old RPC object if it exists
+    if (rpc != nullptr)
+    {
+        delete rpc;
+        rpc = nullptr;
+    }
+
+    // Create a new RPC object (this clears all previous subscriptions)
+    rpc = new Server_Side_RPC<MAX_RPC_SUBSCRIPTIONS, MAX_RPC_RESPONSE>();
+
+    // Subscribe the RPC API implementation after construction
+    tb->Subscribe_API_Implementation(*rpc);
+
+    if (rpc == nullptr)
+    {
+        Serial.println("ThingsBoard Client: ERROR - Failed to create new RPC object!");
+        return;
+    }
+
+    Serial.println("ThingsBoard Client: RPC object recreated successfully");
+}
+
+void ThingsBoardClient::saveTargetTemperature(double targetTemp)
+{
+    preferences.putDouble("targetTemp", targetTemp);
+    Serial.println("ThingsBoard Client: Target temperature saved to preferences: " + String(targetTemp) + "°C");
+}
+void ThingsBoardClient::savePIDParameters(double kp, double ki, double kd)
+{
+    preferences.putDouble("Kp", kp);
+    preferences.putDouble("Ki", ki);
+    preferences.putDouble("Kd", kd);
+    Serial.println("ThingsBoard Client: PID parameters saved to preferences");
 }

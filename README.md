@@ -176,15 +176,9 @@ The system automatically sends telemetry data every 2 seconds:
 ```
 
 #### Update PID Parameters
-```json
-{
-  "method": "setPidParams",
-  "params": {
-    "kp": 45.0,
-    "ki": 2.0,
-    "kd": 10.0
-  }
-}
+Put this into Terminal
+```bash
+setPidParams "{\"kp\": 45, \"ki\": 1.5, \"kd\": 10}"
 ```
 
 ## 🔧 Advanced Usage

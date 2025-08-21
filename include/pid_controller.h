@@ -4,12 +4,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+#include <Preferences.h>
 
 class PIDController
 {
 public:
     // Constructor
-    PIDController(double kp = 50.0, double ki = 1.5, double kd = 12.0);
+    PIDController();
 
     // Destructor
     ~PIDController();
@@ -83,6 +84,9 @@ private:
     // Mutex for data protection
     SemaphoreHandle_t dataMutex;
 
+    // preferences for storing PID parameters and target temperature
+    Preferences preferences;
+
     // Task function (static)
     static void pidControlTask(void *pvParameters);
 
@@ -100,6 +104,9 @@ private:
 
     // Temperature validation helper
     bool isValidTemperature(double temp);
+
+    // Load PID parameters from preferences
+    bool loadParameters();
 };
 
 #endif // PID_CONTROLLER_H

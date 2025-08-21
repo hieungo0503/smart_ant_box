@@ -3,9 +3,8 @@
 #include <Arduino.h>
 #include <esp32-hal-ledc.h>
 
-PIDController::PIDController(double kp, double ki, double kd)
-    : Kp(kp), Ki(ki), Kd(kd), targetTemp(DEFAULT_TARGET_TEMP),
-      error(0.0), lastError(0.0), integral(0.0), derivative(0.0),
+PIDController::PIDController()
+    : error(0.0), lastError(0.0), integral(0.0), derivative(0.0),
       pidOutput(0.0), pwmValue(0), lastPIDTime(0),
       taskHandle(NULL), dataMutex(NULL)
 {
@@ -14,10 +13,16 @@ PIDController::PIDController(double kp, double ki, double kd)
 PIDController::~PIDController()
 {
     stopTask();
+    preferences.end();
 }
 
 bool PIDController::begin()
 {
+    // Initialize Preferences for storing PID parameters and target temperature
+    preferences.begin("smart_config", false);
+    // Load saved PID parameters and target temperature
+    loadParameters();
+
     Serial.println("PID Controller: Initializing...");
 
     if (!initializePWM())
@@ -356,4 +361,25 @@ bool PIDController::initializePWM()
 bool PIDController::isTemperatureSafe(double currentTemp)
 {
     return (abs(currentTemp - targetTemp) <= MAX_TEMP_DIFF);
+}
+
+bool PIDController::loadParameters()
+{
+
+    Kp = preferences.getDouble("Kp", DEFAULT_KP);
+    Ki = preferences.getDouble("Ki", DEFAULT_KI);
+    Kd = preferences.getDouble("Kd", DEFAULT_KD);
+    targetTemp = preferences.getDouble("targetTemp", DEFAULT_TARGET_TEMP);
+
+    Serial.println("PID Controller: Loaded parameters from preferences");
+    Serial.print("  Kp: ");
+    Serial.println(Kp);
+    Serial.print("  Ki: ");
+    Serial.println(Ki);
+    Serial.print("  Kd: ");
+    Serial.println(Kd);
+    Serial.print("  Target Temp: ");
+    Serial.println(targetTemp);
+
+    return true;
 }
