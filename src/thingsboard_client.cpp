@@ -263,6 +263,7 @@ void ThingsBoardClient::sendTelemetryLoop()
                 tb->sendTelemetryData("ki", ki);
                 tb->sendTelemetryData("kd", kd);
                 tb->sendTelemetryData("currentIP", wifiManager->getCurrentIP());
+                tb->sendAttributeData("targetTemp", targetTemp);
 
                 lastTelemetrySend = currentTime;
             }
