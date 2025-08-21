@@ -185,7 +185,13 @@ bool ThingsBoardClient::connectToThingsBoard()
     }
 
     Serial.println("ThingsBoard Client: Connecting...");
-    if (!tb->connect(THINGSBOARD_SERVER, TOKEN, THINGSBOARD_PORT))
+
+    Preferences pref;
+    pref.begin("wifi-config", false);
+    String token = pref.getString("deviceToken", TOKEN);
+    pref.end();
+
+    if (!tb->connect(THINGSBOARD_SERVER, token.c_str(), THINGSBOARD_PORT))
     {
         Serial.println("ThingsBoard Client: Connection failed");
         return false;

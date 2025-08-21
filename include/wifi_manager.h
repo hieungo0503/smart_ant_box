@@ -69,6 +69,7 @@ private:
     // Current WiFi credentials
     String ssid;
     String password;
+    String deviceToken;
 
     // Internal connection attempt
     bool connectToWiFi();
@@ -77,7 +78,7 @@ private:
     bool loadCredentials();
 
     // Save WiFi credentials to preferences
-    void saveCredentials(const String &ssid, const String &password);
+    void saveCredentials(const String &ssid, const String &password, const String &deviceToken);
 
     // Start access point
     void startAccessPoint();

@@ -105,6 +105,8 @@ void WiFiManager::printConnectionInfo()
     else if (isConnected())
     {
         Serial.println("WiFi Manager: Connected successfully");
+        Serial.print("Device Token: ");
+        Serial.println(deviceToken);
         Serial.print("WiFi Manager: SSID: ");
         Serial.println(ssid);
         Serial.print("WiFi Manager: IP address: ");
@@ -218,17 +220,21 @@ bool WiFiManager::loadCredentials()
 {
     ssid = preferences.getString("ssid", "");
     password = preferences.getString("password", "");
+    deviceToken = preferences.getString("deviceToken", TOKEN);
 
     return (ssid.length() > 0);
 }
 
-void WiFiManager::saveCredentials(const String &newSsid, const String &newPassword)
+void WiFiManager::saveCredentials(const String &newSsid, const String &newPassword, const String &newDeviceToken)
 {
+    // Save credentials to preferences
     preferences.putString("ssid", newSsid);
     preferences.putString("password", newPassword);
+    preferences.putString("deviceToken", newDeviceToken);
 
     ssid = newSsid;
     password = newPassword;
+    deviceToken = newDeviceToken;
 
     Serial.println("WiFi Manager: Credentials saved");
 }
@@ -257,6 +263,7 @@ void WiFiManager::setupWebServer()
                {
         String newSsid = "";
         String newPassword = "";
+        String newDeviceToken = "";
         
         if (request->hasParam("ssid", true))
         {
@@ -267,10 +274,15 @@ void WiFiManager::setupWebServer()
         {
             newPassword = request->getParam("password", true)->value();
         }
-        
-        if (newSsid.length() > 0)
+
+        if (request->hasParam("deviceToken", true))
         {
-            saveCredentials(newSsid, newPassword);
+            newDeviceToken = request->getParam("deviceToken", true)->value();
+        }
+        
+        if (newSsid.length() > 0 && newDeviceToken.length() > 0)
+        {
+            saveCredentials(newSsid, newPassword, newDeviceToken);
             request->send(200, "text/html", generateSuccessPage());
             
             // Delay and restart to apply new settings
@@ -288,6 +300,7 @@ void WiFiManager::setupWebServer()
         preferences.clear();
         ssid = "";
         password = "";
+        deviceToken = "";
         request->send(200, "text/html", "<h1>Credentials Reset!</h1><p>Device will restart...</p>");
         delay(3000);
         ESP.restart(); });
@@ -349,10 +362,16 @@ String WiFiManager::generateConfigPage()
             <strong>WiFi Configuration</strong><br>
             Current Status: <span id="currentStatus">Loading...</span><br>
             Current Network: <span id="currentNetwork">Loading...</span><br>
+            Current Device Token: <span id="currentDeviceToken">Loading...</span><br>
             Connect your ESP32 to your WiFi network to enable remote monitoring and control via ThingsBoard.
         </div>
         
         <form action="/configure" method="post">
+            <div class="form-group">
+                <label for="ssid">Device Token ID:</label>
+                <input type="text" id="deviceToken" name="deviceToken" required placeholder="Enter Your Device Token">
+            </div>
+
             <div class="form-group">
                 <label for="ssid">WiFi Network Name (SSID):</label>
                 <input type="text" id="ssid" name="ssid" required placeholder="Enter WiFi network name">
@@ -388,10 +407,12 @@ String WiFiManager::generateConfigPage()
                 .then(data => {
                     document.getElementById('currentStatus').textContent = data.connected ? 'Connected ✅' : 'Disconnected ❌';
                     document.getElementById('currentNetwork').textContent = data.ssid || 'None';
+                    document.getElementById('currentDeviceToken').textContent = data.current_device_token || 'None';
                 })
                 .catch(error => {
                     document.getElementById('currentStatus').textContent = 'Error loading status';
                     document.getElementById('currentNetwork').textContent = 'Unknown';
+                    document.getElementById('currentDeviceToken').textContent = 'Unknown';
                 });
         }
         
@@ -473,6 +494,7 @@ void WiFiManager::startPermanentWebServer()
                         {
         String newSsid = "";
         String newPassword = "";
+        String newDeviceToken = "";
         
         if (request->hasParam("ssid", true))
         {
@@ -483,10 +505,15 @@ void WiFiManager::startPermanentWebServer()
         {
             newPassword = request->getParam("password", true)->value();
         }
-        
-        if (newSsid.length() > 0)
+
+        if (request->hasParam("deviceToken", true))
         {
-            saveCredentials(newSsid, newPassword);
+            newDeviceToken = request->getParam("deviceToken", true)->value();
+        }
+        
+        if (newSsid.length() > 0 && newDeviceToken.length() > 0)
+        {
+            saveCredentials(newSsid, newPassword, newDeviceToken);
             request->send(200, "text/html", generateSuccessPage());
             
             // Delay and restart to apply new settings
@@ -504,6 +531,7 @@ void WiFiManager::startPermanentWebServer()
         preferences.clear();
         ssid = "";
         password = "";
+        deviceToken = "";
         request->send(200, "text/html", "<h1>Credentials Reset!</h1><p>Device will restart...</p>");
         delay(3000);
         ESP.restart(); });
@@ -529,6 +557,7 @@ void WiFiManager::startPermanentWebServer()
     permanentServer->on("/status", HTTP_GET, [this](AsyncWebServerRequest *request)
                         {
         String json = "{";
+        json += "\"current_device_token\": \"" + deviceToken + "\",";
         json += "\"connected\": " + String(isConnected() ? "true" : "false") + ",";
         json += "\"ssid\": \"" + ssid + "\",";
         json += "\"ip\": \"" + getLocalIP().toString() + "\",";
